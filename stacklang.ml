@@ -26,10 +26,12 @@ type com =
   | Pop
   | Add | Sub | Mul | Div
   | And | Or | Not
-  | Lt | Gt| Eq | Neq
+  | Lt | Gt| Eq
   | If of prog * prog
   | Jmp | Jz | Call | Ret
   | Swap | Over | Rot
+  | Bind | Lookup
+  | Fun of prog
 and prog = com list
 
 (*  Eliminates whitespaces from charlist by building new charlist which ignores them  *)
@@ -39,6 +41,9 @@ let rec whitespace (xs : char list) : char list =
     | ' ' :: rest -> helper rest accum
     | '\t' :: rest -> helper rest accum
     | '\n' :: rest -> helper rest accum
+    | '(' :: rest -> helper rest accum
+    | ')' :: rest -> helper rest accum
+    | ',' :: rest -> helper rest accum
     (*| '\f' :: rest -> helper rest accum*)
     (*| '\v' :: rest -> helper rest accum*)
     | c :: rest -> helper rest (c :: accum)
@@ -106,7 +111,6 @@ let rec parse_matcher (xs : char list) =
     | 'L' :: 't' :: ';' :: rest ->         helper rest (Lt :: accum)
     | 'G' :: 't' :: ';' :: rest ->         helper rest (Gt :: accum)
     | 'E' :: 'q' :: ';' :: rest ->         helper rest (Eq :: accum)
-    | 'N' :: 'e' :: 'q' :: ';' :: rest ->  helper rest (Neq :: accum)
 
     | 'J' :: 'm' :: 'p' :: ';' :: rest ->         helper rest (Jmp :: accum)
     | 'J' :: 'z' :: ';' :: rest ->                helper rest (Jz :: accum)
@@ -117,9 +121,34 @@ let rec parse_matcher (xs : char list) =
     | 'O' :: 'v' :: 'e' :: 'r' :: ';' :: rest -> helper rest (Over :: accum)
     | 'R' :: 'o' :: 't' :: ';' :: rest ->        helper rest (Rot :: accum)
 
-    | _  :: rest -> helper rest accum (*  Implement in future some form of compilation error here   *)
+    | 'B' :: 'i' :: 'n' :: 'd' :: ';' :: rest ->                helper rest (Bind :: accum)
+    | 'L' :: 'o' :: 'o' :: 'k' :: 'u' :: 'p' :: ';' :: rest ->  helper rest (Lookup :: accum)
+
+    | 'I' :: 'f' :: rest -> (
+      let c1, rest_after_else = extract_until_else rest in
+      let c2, rest_after_end = extract_until_end rest_after_else in
+      helper rest_after_end (If ((parse_matcher c1, parse_matcher c2)) :: accum)
+    )
+    | 'F' :: 'u' :: 'n' :: rest -> (
+      let c1, rest_after_end = extract_until_end rest in
+      helper rest_after_end ((Fun (parse_matcher c1)) :: accum)
+    )
+
     | [] -> accum
+    | _  :: rest -> helper rest accum (*  Implement in future some form of compilation error here   *)
   in List.rev(helper ws ([] : prog))
+and extract_until_end xs =
+  let rec aux acc = function
+    | 'E' :: 'n' :: 'd' :: ';' :: rest -> (List.rev acc, rest)
+    | [] -> failwith "Unexpected end of input while parsing Fun"
+    | c :: rest -> aux (c :: acc) rest
+in aux [] xs
+and extract_until_else xs =
+  let rec aux acc = function
+  | 'E' :: 'l' :: 's' :: 'e' :: rest -> (List.rev acc, rest)
+  | [] -> failwith "Unexpected end of input while parsing If with Else"
+  | c :: rest -> aux (c :: acc) rest
+in aux [] xs
 
 (*  Takes a string and return a character list made of its character  *)
 let string_listize (s : string) : char list =
