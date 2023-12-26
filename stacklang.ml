@@ -25,14 +25,16 @@ type com =
   | Push of const | Dup
   | Pop
   | Add | Sub | Mul | Div
+  | Swap | Over | Rot
   | And | Or | Not
   | Lt | Gt| Eq
   | If of prog * prog
   | Jmp | Jz | Call | Ret
-  | Swap | Over | Rot
   | Bind | Lookup
   | Fun of prog
+  | Trace
 and prog = com list
+type output = string list
 
 (*  Eliminates whitespaces from charlist by building new charlist which ignores them  *)
 let rec whitespace (xs : char list) : char list =
@@ -72,6 +74,7 @@ let rec parse_string accum = function
   | xs -> raise No_Proper_Closure
 
 
+(*  Reads characters to find correct Constant Type. If character does not relate to a constant, raise exception   *)
 exception InvalidConst of char
 let rec parse_const (xs : char list) : const =
   let rec helper xs =
@@ -93,10 +96,11 @@ let rec parse_const (xs : char list) : const =
   
 (*  Parses our character list to check for valid commands, creates a program of these commands  *)
 let rec parse_matcher (xs : char list) = 
-  let ws = whitespace xs in
+  let ws = whitespace xs in (*Eliminate whietsapces so we can pattern match with ease through each character*)
   let rec helper xs accum = (*helper function which takes the character list & accumulator to build program*)
     match xs with
     | 'P' :: 'u' :: 's' :: 'h' :: rest -> helper rest ((Push (parse_const rest)) :: accum)
+    | 'D' :: 'u' :: 'p' :: ';' :: rest ->        helper rest (Dup :: accum)
     | 'P' :: 'o' :: 'p' :: ';' :: rest ->        helper rest (Pop :: accum)
 
     | 'A' :: 'd' :: 'd' :: ';' :: rest -> helper rest (Add :: accum)
@@ -134,6 +138,7 @@ let rec parse_matcher (xs : char list) =
       helper rest_after_end ((Fun (parse_matcher c1)) :: accum)
     )
 
+    | 'T' :: 'r' :: 'a' :: 'c' :: 'e' :: ';' :: rest -> helper rest (Trace :: accum)
     | [] -> accum
     | _  :: rest -> helper rest accum (*  Implement in future some form of compilation error here   *)
   in List.rev(helper ws ([] : prog))
@@ -150,6 +155,7 @@ and extract_until_else xs =
   | c :: rest -> aux (c :: acc) rest
 in aux [] xs
 
+
 (*  Takes a string and return a character list made of its character  *)
 let string_listize (s : string) : char list =
   let rec helper index acc =
@@ -159,6 +165,138 @@ let string_listize (s : string) : char list =
       helper (index - 1) (s.[index] :: acc)
   in
   helper (String.length s - 1) []
+
 (*  Parser which takes string from user and turns into stack language   *)
 let parser (s : string) : prog = 
   parse_matcher(string_listize(s))
+
+
+let push_com(curr_stack)(c)=
+  curr_stack = (c :: curr_stack)
+
+let dup_com (curr_stack)=
+  match curr_stack with
+  | x :: xs -> (x :: curr_stack)
+  | [] -> failwith "Empty stack. Nothing to Duplicate"
+
+let pop_com (curr_stack)=
+  match curr_stack with
+  | x :: xs -> xs (*Returns the stack w/o first element*)
+  | [] -> failwith "Empty stack. Nothing to Pop"
+
+let bopr_com (curr_stack)(opr)=
+  match opr with
+  | Add -> 
+    (match curr_stack with
+    | (Int x1) :: (Int x2) :: xs -> 
+      let res = pop_com curr_stack in
+      let res = pop_com curr_stack in
+      push_com (res)(x1 + x2)
+    | _ -> failwith "Add failure. Two integers do not exist at the top of the stack"
+    )
+  | Sub ->
+    (match curr_stack with
+    | (Int x1) :: (Int x2) :: xs -> 
+      let res = pop_com curr_stack in
+      let res = pop_com curr_stack in
+      push_com (res)(x1 - x2)
+    | _ -> failwith "Subtraction failure. Two integers do not exist at the top of the stack"
+    )
+  | Mul ->
+    (match curr_stack with
+    | (Int x1) :: (Int x2) :: xs -> 
+      let res = pop_com curr_stack in
+      let res = pop_com curr_stack in
+      push_com (res)(x1 * x2)
+    | _ -> failwith "Multiplication failure. Two integers do not exist at the top of the stack"
+    )
+  | Div ->
+    (match curr_stack with
+    | (Int x1) :: (Int x2) :: xs -> 
+      let res = pop_com curr_stack in
+      let res = pop_com curr_stack in
+      push_com (res)(x1/x2)
+    | _ -> failwith "Division failure. Two integers do not exist at the top of the stack"
+    )
+  | Lt -> 
+    (match curr_stack with
+    | (Int x1) :: (Int x2) :: xs -> 
+      let res = pop_com curr_stack in
+      let res = pop_com curr_stack in
+      push_com (res)(x1 < x2)
+    | _ -> failwith "Less than failure. Two integers do not exist at the top of the stack"
+    )
+  | Gt ->
+    (match curr_stack with
+    | (Int x1) :: (Int x2) :: xs -> 
+      let res = pop_com curr_stack in
+      let res = pop_com curr_stack in
+      push_com (res)(x1 > x2)
+    | _ -> failwith "Greater than failure. Two integers do not exist at the top of the stack"
+    )
+  | Eq -> 
+    (match curr_stack with
+    | (Int x1) :: (Int x2) :: xs -> 
+      let res = pop_com curr_stack in
+      let res = pop_com curr_stack in
+      push_com (res)(x1 = x2)
+    | _ -> failwith "Equal-to failure. Two integers do not exist at the top of the stack"
+    )
+  | And ->
+    (match curr_stack with
+    | (Bool x1) :: (Bool x2) :: xs -> 
+      let res = pop_com curr_stack in
+      let res = pop_com curr_stack in
+      push_com (res)(x1 && x2)
+    | _ -> failwith "And failure. Two booleans do not exist at the top of the stack"
+    )
+  | Or ->
+    (match curr_stack with
+    | (Bool x1) :: (Bool x2) :: xs -> 
+      let res = pop_com curr_stack in
+      let res = pop_com curr_stack in
+      push_com (res)(x1 || x2)
+    | _ -> failwith "Or failure. Two booleans do not exist at the top of the stack"
+    )
+  | Swap ->
+    (match curr_stack with
+    | x1 :: x2 :: xs -> 
+      let res = pop_com curr_stack in
+      let res = pop_com curr_stack in
+      let res = push_com (res)(x1) in
+      push_com (res)(x2)
+    | _ -> failwith "Or failure. Two booleans do not exist at the top of the stack"
+    )
+
+
+(*  Runs whole stack program and returns end result   *)
+let execute (s : string) : output
+  let program = parser(s) in
+  let rec helper program curr_stack =
+    match program with
+    | Push c :: rest -> helper rest (c :: curr_stack)
+    | Dup :: rest -> helper rest (dup_com(curr_stack))
+    | Pop :: rest -> helper rest (pop_com(curr_stack))
+    | Add :: rest -> helper rest (bopr_com(curr_stack)(Add))
+    | Sub :: rest -> helper rest (bopr_com(curr_stack)(Sub))
+    | Mul :: rest -> helper rest (bopr_com(curr_stack)(Mul))
+    | Div :: rest -> helper rest (bopr_com(curr_stack)(Div))
+    | Swap :: rest -> -> helper rest (bopr_com(curr_stack)(Swap))
+    | Over :: rest
+    | Rot :: rest
+    | And :: rest -> helper rest (bopr_com(curr_stack)(And))
+    | Or  :: rest -> helper rest (bopr_com(curr_stack)(Or))
+    | Not :: rest
+    | Lt :: rest -> helper rest (bopr_com(curr_stack)(Lt))
+    | Gt :: rest -> helper rest (bopr_com(curr_stack)(Gt))
+    | Eq :: rest -> helper rest (bopr_com(curr_stack)(Eq))
+    | If(c1, c2) :: rest
+    | Jmp :: rest
+    | Jz :: rest
+    | Call :: rest
+    | Ret :: rest
+    | Bind :: rest
+    | Lookup :: rest
+    | Fun(c1) :: rest
+    | Trace :: rest
+  in helper program []
