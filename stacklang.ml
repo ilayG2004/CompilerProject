@@ -21,6 +21,7 @@ type const =
   | Bool of bool
   | Unit
   | Symbol of string
+  | Closure of (string * ((string * const) list) * coms)
 type com =
   | Push of const | Dup
   | Pop
@@ -171,157 +172,216 @@ let parser (s : string) : prog =
   parse_matcher(string_listize(s))
 
 
-let push_com (curr_stack)(c)=
-  curr_stack = (c :: curr_stack)
+let push_com (c_stack)(c)=
+  c_stack = (c :: c_stack)
 
-let dup_com (curr_stack)=
-  match curr_stack with
-  | x :: xs -> (x :: curr_stack)
+let dup_com (c_stack)=
+  match c_stack with
+  | x :: xs -> (x :: c_stack)
   | [] -> failwith "Dup failure. Empty stack. Nothing to Duplicate"
 
-let pop_com (curr_stack)=
-  match curr_stack with
+let pop_com (c_stack)=
+  match c_stack with
   | x :: xs -> xs (*Returns the stack w/o first element*)
   | [] -> failwith "Pop failure. Empty stack. Nothing to Pop"
 
-let not_com (curr_stack)=
-  match curr_stack with
+let not_com (c_stack)=
+  match c_stack with
   | (Bool x) :: xs -> 
-    let res = pop_com curr_stack in
+    let res = pop_com c_stack in
     push_com res (not x)
   | _ :: xs ->  failwith "Not failuire. Top value not boolean"
   | [] ->       failwith "Not failure. Empty stack"
 
-let bind_com (curr_stack)(curr_var_env)=
-    match curr_stack with
+let bind_com (c_stack)(c_var_env)=
+    match c_stack with
     | (Symbol x) :: v :: xs ->
-      let res = pop_com curr_stack in
-      let res = pop_com curr_stack in
-      (res, ((x, v) :: curr_var_env))
+      let res = pop_com c_stack in
+      let res = pop_com c_stack in
+      (res, ((x, v) :: c_var_env))
     | x :: v :: xs -> failwith "Bind failure. Top of stack is not symbol"
     | x :: xs -> failwith "Bind failure. Only one element in stack"
     | [] -> failwith "Bind failure. Empty stack"
 
-let bopr_com (curr_stack)(opr)=
+let rec str_of_nat (n : int) : string =
+  let d = n mod 10 in 
+  let n0 = n / 10 in
+  let s = str (chr (d + ord '0')) in 
+  if 0 < n0 then
+    string_append (str_of_nat n0) s
+  else s
+ 
+let str_of_int (n : int) : string = 
+  if n < 0 then
+    string_append "-" (str_of_nat (-n))
+  else str_of_nat n
+ 
+let toString (c : const) : string =
+  match c with
+  | Int i -> str_of_int i
+  | Bool true -> "True"
+  | Bool false -> "False"
+  | Unit -> "Unit"
+  | Symbol s -> s
+  | Closure (s, v, p) -> 
+    let s1 = string_append ("Fun<") (s) in
+    string_append (s1) (">")
+  | _ -> failwith "Trace failure. Invalid constant"
+
+let trace_com (c_stack)(c_out)=
+  match c_stack with
+  | x :: xs -> 
+    let res = pop_com c_stack in
+    let s_res = toString x in
+    (res, (s_res :: c_out))
+  | [] -> failwith "Trace failure. Empty stack"
+
+let lookup_com (c_stack)=
+  match c_stack with
+  | (Symbol x) :: xs ->
+    let res = pop_com c_stack in
+  | x :: xs -> failwith "Lookup failure. Top of stack is not symbol"
+  | [] -> failwith "Lookup failure. Empty stack"
+
+let bopr_com (c_stack)(opr)=
   match opr with
   | Add -> 
-    (match curr_stack with
+    (match c_stack with
     | (Int x1) :: (Int x2) :: xs -> 
-      let res = pop_com curr_stack in
-      let res = pop_com curr_stack in
+      let res = pop_com c_stack in
+      let res = pop_com c_stack in
       push_com (res)(x1 + x2)
     | _ -> failwith "Add failure. Two integers do not exist at the top of the stack"
     )
   | Sub ->
-    (match curr_stack with
+    (match c_stack with
     | (Int x1) :: (Int x2) :: xs -> 
-      let res = pop_com curr_stack in
-      let res = pop_com curr_stack in
+      let res = pop_com c_stack in
+      let res = pop_com c_stack in
       push_com (res)(x1 - x2)
     | _ -> failwith "Subtraction failure. Two integers do not exist at the top of the stack"
     )
   | Mul ->
-    (match curr_stack with
+    (match c_stack with
     | (Int x1) :: (Int x2) :: xs -> 
-      let res = pop_com curr_stack in
-      let res = pop_com curr_stack in
+      let res = pop_com c_stack in
+      let res = pop_com c_stack in
       push_com (res)(x1 * x2)
     | _ -> failwith "Multiplication failure. Two integers do not exist at the top of the stack"
     )
   | Div ->
-    (match curr_stack with
+    (match c_stack with
     | (Int x1) :: (Int x2) :: xs -> 
-      let res = pop_com curr_stack in
-      let res = pop_com curr_stack in
+      let res = pop_com c_stack in
+      let res = pop_com c_stack in
       push_com (res)(x1/x2)
     | _ -> failwith "Division failure. Two integers do not exist at the top of the stack"
     )
   | Lt -> 
-    (match curr_stack with
+    (match c_stack with
     | (Int x1) :: (Int x2) :: xs -> 
-      let res = pop_com curr_stack in
-      let res = pop_com curr_stack in
+      let res = pop_com c_stack in
+      let res = pop_com c_stack in
       push_com (res)(x1 < x2)
     | _ -> failwith "Less than failure. Two integers do not exist at the top of the stack"
     )
   | Gt ->
-    (match curr_stack with
+    (match c_stack with
     | (Int x1) :: (Int x2) :: xs -> 
-      let res = pop_com curr_stack in
-      let res = pop_com curr_stack in
+      let res = pop_com c_stack in
+      let res = pop_com c_stack in
       push_com (res)(x1 > x2)
     | _ -> failwith "Greater than failure. Two integers do not exist at the top of the stack"
     )
   | Eq -> 
-    (match curr_stack with
+    (match c_stack with
     | (Int x1) :: (Int x2) :: xs -> 
-      let res = pop_com curr_stack in
-      let res = pop_com curr_stack in
+      let res = pop_com c_stack in
+      let res = pop_com c_stack in
       push_com (res)(x1 = x2)
     | _ -> failwith "Equal-to failure. Two integers do not exist at the top of the stack"
     )
   | And ->
-    (match curr_stack with
+    (match c_stack with
     | (Bool x1) :: (Bool x2) :: xs -> 
-      let res = pop_com curr_stack in
-      let res = pop_com curr_stack in
+      let res = pop_com c_stack in
+      let res = pop_com c_stack in
       push_com (res)(x1 && x2)
     | _ -> failwith "And failure. Two booleans do not exist at the top of the stack"
     )
   | Or ->
-    (match curr_stack with
+    (match c_stack with
     | (Bool x1) :: (Bool x2) :: xs -> 
-      let res = pop_com curr_stack in
-      let res = pop_com curr_stack in
+      let res = pop_com c_stack in
+      let res = pop_com c_stack in
       push_com (res)(x1 || x2)
     | _ -> failwith "Or failure. Two booleans do not exist at the top of the stack"
     )
   | Swap ->
-    (match curr_stack with
+    (match c_stack with
     | x1 :: x2 :: xs -> 
-      let res = pop_com curr_stack in
-      let res = pop_com curr_stack in
+      let res = pop_com c_stack in
+      let res = pop_com c_stack in
       let res = push_com (res)(x1) in
       push_com (res)(x2)
     | _ -> failwith "Swap failure. Two constants do not exist at the top of the stack"
     )
   | Over ->
-    (match curr_stack with
-    | x1 :: x2 :: xs -> push_com (curr_stack)(x2) (*Duplicate second item from top of stack and put it on top*)
+    (match c_stack with
+    | x1 :: x2 :: xs -> push_com (c_stack)(x2) (*Duplicate second item from top of stack and put it on top*)
     | _ -> failwith "Over failure. Two constants do not exist at the top of the stack, such that the second item from the top can be cloned"
     )
 
 
 (*  Runs whole stack program and returns end result   *)
-let execute (s : string) : output
+let execute (s : string) : output=
   let program = parser(s) in
-  let rec helper program curr_stack curr_var_env =
+  let rec helper program c_stack c_var_env c_out = (* approach adheres to the principles of immutability, making the function more modular*)
     match program with
-    | Push c :: rest ->   helper rest (c :: curr_stack)
-    | Dup :: rest ->      helper rest (dup_com(curr_stack)) curr_var_env
-    | Pop :: rest ->      helper rest (pop_com(curr_stack)) curr_var_env
-    | Add :: rest ->      helper rest (bopr_com(curr_stack)(Add)) curr_var_env
-    | Sub :: rest ->      helper rest (bopr_com(curr_stack)(Sub)) curr_var_env
-    | Mul :: rest ->      helper rest (bopr_com(curr_stack)(Mul)) curr_var_env
-    | Div :: rest ->      helper rest (bopr_com(curr_stack)(Div)) curr_var_env
-    | Swap :: rest ->     helper rest (bopr_com(curr_stack)(Swap)) curr_var_env
-    | Over :: rest ->     helper rest (bopr_com(curr_stack)(Over)) curr_var_env
-    | And :: rest ->      helper rest (bopr_com(curr_stack)(And)) curr_var_env
-    | Or  :: rest ->      helper rest (bopr_com(curr_stack)(Or)) curr_var_env
-    | Not :: rest ->      helper rest (not_com(curr_stack)) curr_var_env
-    | Lt :: rest ->       helper rest (bopr_com(curr_stack)(Lt)) curr_var_env
-    | Gt :: rest ->       helper rest (bopr_com(curr_stack)(Gt)) curr_var_env
-    | Eq :: rest ->       helper rest (bopr_com(curr_stack)(Eq)) curr_var_env
-    | If(c1, c2) :: rest
-    | Jmp :: rest
-    | Jz :: rest
+    | [] -> c_out
+    | Push c :: rest ->   helper rest (c :: c_stack)            c_var_env c_out
+    | Dup :: rest ->      helper rest (dup_com(c_stack))        c_var_env c_out
+    | Pop :: rest ->      helper rest (pop_com(c_stack))        c_var_env c_out
+    | Add :: rest ->      helper rest (bopr_com(c_stack)(Add))  c_var_env c_out
+    | Sub :: rest ->      helper rest (bopr_com(c_stack)(Sub))  c_var_env c_out
+    | Mul :: rest ->      helper rest (bopr_com(c_stack)(Mul))  c_var_env c_out
+    | Div :: rest ->      helper rest (bopr_com(c_stack)(Div))  c_var_env c_out
+    | Swap :: rest ->     helper rest (bopr_com(c_stack)(Swap)) c_var_env c_out
+    | Over :: rest ->     helper rest (bopr_com(c_stack)(Over)) c_var_env c_out
+    | And :: rest ->      helper rest (bopr_com(c_stack)(And))  c_var_env c_out
+    | Or  :: rest ->      helper rest (bopr_com(c_stack)(Or))   c_var_env c_out
+    | Not :: rest ->      helper rest (not_com(c_stack))        c_var_env c_out
+    | Lt :: rest ->       helper rest (bopr_com(c_stack)(Lt))   c_var_env c_out
+    | Gt :: rest ->       helper rest (bopr_com(c_stack)(Gt))   c_var_env c_out
+    | Eq :: rest ->       helper rest (bopr_com(c_stack)(Eq))   c_var_env c_out
+    | If(c1, c2) :: rest->
+      (
+      match c_stack with
+      | (Bool x) :: xs -> 
+          let res = pop_com c_stack in
+          if x = true then 
+            helper (c1 @ rest) res c_var_env c_out
+          else 
+            helper (c2 @ rest) res c_var_env c_out
+      | x :: xs -> failwith "If Statement failure. No Boolean on top of stack to read"
+      | [] -> failwith "If Statement failure. Empty stack"
+      )
+    (*| Jmp :: rest*)
+    (*| Jz :: rest*)
     | Call :: rest
-    | Ret :: rest
+    | Ret :: rest 
     | Bind :: rest ->
-      match bind_com(curr_stack)(curr_var_env) with
-      | cs :: cve :: xs -> helper rest cs cve
-      | _ :: -> failwith "Bind did not return proper environments"
-    | Lookup :: rest
+      (
+      match bind_com(c_stack)(c_var_env) with
+      | (cs, cve) -> helper rest cs cve c_out (*Extract the current stack and current variable environment from bind's output and pass it into helper*)
+      | _ -> failwith "Bind did not return proper environments"
+      )
+    | Lookup :: rest ->       helper rest (lookup_com(c_stack))     c_var_env c_out
     | Fun(c1) :: rest
-    | Trace :: rest
-  in helper program []
+    | Trace :: rest ->
+      (
+      match trace_com(c_stack)(c_out) with
+      | (cs, co) -> helper rest cs c_var_env co
+      | _ -> failwith "Trace did not return proper stack & output"
+      )
+  in helper program [] [] []
