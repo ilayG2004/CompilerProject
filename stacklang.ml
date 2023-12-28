@@ -21,8 +21,8 @@ type const =
   | Bool of bool
   | Unit
   | Symbol of string
-  | Closure of (string * ((string * const) list) * coms)
-type com =
+  | Closure of (string * ((string * const) list) * prog)
+and com =
   | Push of const | Dup
   | Pop
   | Add | Sub | Mul | Div
@@ -36,7 +36,7 @@ type com =
   | Trace
 and prog = com list
 type output = string list
-type var_env = (const, const) list
+type var_env = (string * const) list
 
 (*  Eliminates whitespaces from charlist by building new charlist which ignores them  *)
 let rec whitespace (xs : char list) : char list =
@@ -173,7 +173,7 @@ let parser (s : string) : prog =
 
 
 let push_com (c_stack)(c)=
-  c_stack = (c :: c_stack)
+  (c :: c_stack)
 
 let dup_com (c_stack)=
   match c_stack with
@@ -187,18 +187,13 @@ let pop_com (c_stack)=
 
 let not_com (c_stack)=
   match c_stack with
-  | (Bool x) :: xs -> 
-    let res = pop_com c_stack in
-    push_com res (not x)
+  | (Bool x) :: xs -> push_com xs (Bool(not x))
   | _ :: xs ->  failwith "Not failuire. Top value not boolean"
   | [] ->       failwith "Not failure. Empty stack"
 
 let bind_com (c_stack)(c_var_env)=
     match c_stack with
-    | (Symbol x) :: v :: xs ->
-      let res = pop_com c_stack in
-      let res = pop_com c_stack in
-      (res, ((x, v) :: c_var_env))
+    | (Symbol x) :: v :: xs -> (xs, ((x, v) :: c_var_env))
     | x :: v :: xs -> failwith "Bind failure. Top of stack is not symbol"
     | x :: xs -> failwith "Bind failure. Only one element in stack"
     | [] -> failwith "Bind failure. Empty stack"
@@ -206,14 +201,14 @@ let bind_com (c_stack)(c_var_env)=
 let rec str_of_nat (n : int) : string =
   let d = n mod 10 in 
   let n0 = n / 10 in
-  let s = str (chr (d + ord '0')) in 
+  let s = String.make 1 (Char.chr (d + Char.code '0')) in 
   if 0 < n0 then
-    string_append (str_of_nat n0) s
+    (str_of_nat n0) ^ s
   else s
  
 let str_of_int (n : int) : string = 
   if n < 0 then
-    string_append "-" (str_of_nat (-n))
+    "-" ^ (str_of_nat (-n))
   else str_of_nat n
  
 let toString (c : const) : string =
@@ -223,23 +218,45 @@ let toString (c : const) : string =
   | Bool false -> "False"
   | Unit -> "Unit"
   | Symbol s -> s
-  | Closure (s, v, p) -> 
-    let s1 = string_append ("Fun<") (s) in
-    string_append (s1) (">")
+  | Closure (s, v, p) -> ("Fun<") ^ (s) ^ (">")
   | _ -> failwith "Trace failure. Invalid constant"
 
 let trace_com (c_stack)(c_out)=
   match c_stack with
   | x :: xs -> 
-    let res = pop_com c_stack in
     let s_res = toString x in
-    (res, (s_res :: c_out))
+    (xs, (s_res :: c_out))
   | [] -> failwith "Trace failure. Empty stack"
 
-let lookup_com (c_stack)=
+
+let fun_com (c_stack)(c_var_env)(c1)=
   match c_stack with
-  | (Symbol x) :: xs ->
+  | (Symbol x) :: xs -> push_com xs (Closure(x, c_var_env, c1)) (* Replace the symbol with a function closure named after the symbol, and clone variable environment into it *)
+  | x :: xs -> failwith "Function failure. Top value of stack is not symbol"
+  | [] -> failwith "Function failure. Empty stack"
+
+(*  Ret command consumes closure, then executes the commands C with variable environment ve   *)
+let ret_com (c_stack)=
+  match c_stack with
+  | Closure (f, vf, c) :: a :: xs -> 
     let res = pop_com c_stack in
+    (res, c) (* Return our new stack a :: xs, and the commands we now need to execute*)
+  | [] -> failwith "Ret failure. Empty stack"
+  | _ -> failwith "Ret failure. Closure and some constant a, do not exist at top of the stack"
+
+let lookup_com (c_stack)(c_var_env)=
+  match c_stack with
+  | (Symbol x1) :: xs ->
+    let rec vloop c_var_env =
+      (match c_var_env with
+      | (x2, y) :: xy -> 
+        if x1 = x2 then
+          push_com xs y (*Remove symbol (by ignoring x1) then push value*)
+        else
+          vloop xy
+      | [] -> failwith "Lookup failure. No variable found in variable environment which matches lookup parameter"
+      )
+    in vloop c_var_env
   | x :: xs -> failwith "Lookup failure. Top of stack is not symbol"
   | [] -> failwith "Lookup failure. Empty stack"
 
@@ -247,83 +264,52 @@ let bopr_com (c_stack)(opr)=
   match opr with
   | Add -> 
     (match c_stack with
-    | (Int x1) :: (Int x2) :: xs -> 
-      let res = pop_com c_stack in
-      let res = pop_com c_stack in
-      push_com (res)(x1 + x2)
+    | (Int x1) :: (Int x2) :: xs -> (Int (x1 + x2) :: xs)
     | _ -> failwith "Add failure. Two integers do not exist at the top of the stack"
     )
   | Sub ->
     (match c_stack with
-    | (Int x1) :: (Int x2) :: xs -> 
-      let res = pop_com c_stack in
-      let res = pop_com c_stack in
-      push_com (res)(x1 - x2)
+    | (Int x1) :: (Int x2) :: xs -> (Int (x1 - x2) :: xs)
     | _ -> failwith "Subtraction failure. Two integers do not exist at the top of the stack"
     )
   | Mul ->
     (match c_stack with
-    | (Int x1) :: (Int x2) :: xs -> 
-      let res = pop_com c_stack in
-      let res = pop_com c_stack in
-      push_com (res)(x1 * x2)
+    | (Int x1) :: (Int x2) :: xs -> (Int (x1*x2) :: xs)
     | _ -> failwith "Multiplication failure. Two integers do not exist at the top of the stack"
     )
   | Div ->
     (match c_stack with
-    | (Int x1) :: (Int x2) :: xs -> 
-      let res = pop_com c_stack in
-      let res = pop_com c_stack in
-      push_com (res)(x1/x2)
+    | (Int x1) :: (Int x2) :: xs -> (Int (x1/x2) :: xs)
     | _ -> failwith "Division failure. Two integers do not exist at the top of the stack"
     )
   | Lt -> 
     (match c_stack with
-    | (Int x1) :: (Int x2) :: xs -> 
-      let res = pop_com c_stack in
-      let res = pop_com c_stack in
-      push_com (res)(x1 < x2)
+    | (Int x1) :: (Int x2) :: xs -> (Bool (x1 < x2) :: xs)
     | _ -> failwith "Less than failure. Two integers do not exist at the top of the stack"
     )
   | Gt ->
     (match c_stack with
-    | (Int x1) :: (Int x2) :: xs -> 
-      let res = pop_com c_stack in
-      let res = pop_com c_stack in
-      push_com (res)(x1 > x2)
+    | (Int x1) :: (Int x2) :: xs -> (Bool (x1 > x2) :: xs)
     | _ -> failwith "Greater than failure. Two integers do not exist at the top of the stack"
     )
   | Eq -> 
     (match c_stack with
-    | (Int x1) :: (Int x2) :: xs -> 
-      let res = pop_com c_stack in
-      let res = pop_com c_stack in
-      push_com (res)(x1 = x2)
+    | (Int x1) :: (Int x2) :: xs -> (Bool (x1 = x2) :: xs)
     | _ -> failwith "Equal-to failure. Two integers do not exist at the top of the stack"
     )
   | And ->
     (match c_stack with
-    | (Bool x1) :: (Bool x2) :: xs -> 
-      let res = pop_com c_stack in
-      let res = pop_com c_stack in
-      push_com (res)(x1 && x2)
+    | (Bool x1) :: (Bool x2) :: xs -> (Bool (x1 && x2) :: xs)
     | _ -> failwith "And failure. Two booleans do not exist at the top of the stack"
     )
   | Or ->
     (match c_stack with
-    | (Bool x1) :: (Bool x2) :: xs -> 
-      let res = pop_com c_stack in
-      let res = pop_com c_stack in
-      push_com (res)(x1 || x2)
+    | (Bool x1) :: (Bool x2) :: xs -> (Bool (x1 || x2) :: xs)
     | _ -> failwith "Or failure. Two booleans do not exist at the top of the stack"
     )
   | Swap ->
     (match c_stack with
-    | x1 :: x2 :: xs -> 
-      let res = pop_com c_stack in
-      let res = pop_com c_stack in
-      let res = push_com (res)(x1) in
-      push_com (res)(x2)
+    | x1 :: x2 :: xs -> (x2 :: x1 :: xs)
     | _ -> failwith "Swap failure. Two constants do not exist at the top of the stack"
     )
   | Over ->
@@ -335,7 +321,7 @@ let bopr_com (c_stack)(opr)=
 
 (*  Runs whole stack program and returns end result   *)
 let execute (s : string) : output=
-  let program = parser(s) in
+  let program = parser s in
   let rec helper program c_stack c_var_env c_out = (* approach adheres to the principles of immutability, making the function more modular*)
     match program with
     | [] -> c_out
@@ -358,30 +344,43 @@ let execute (s : string) : output=
       (
       match c_stack with
       | (Bool x) :: xs -> 
-          let res = pop_com c_stack in
           if x = true then 
-            helper (c1 @ rest) res c_var_env c_out
+            helper (c1 @ rest) xs c_var_env c_out
           else 
-            helper (c2 @ rest) res c_var_env c_out
+            helper (c2 @ rest) xs c_var_env c_out
       | x :: xs -> failwith "If Statement failure. No Boolean on top of stack to read"
       | [] -> failwith "If Statement failure. Empty stack"
       )
     (*| Jmp :: rest*)
     (*| Jz :: rest*)
-    | Call :: rest
-    | Ret :: rest 
+    | Call :: rest ->
+      (
+      match c_stack with
+      | Closure (n, vfe, c) :: a :: xs -> 
+        let new_ve = ((n, Closure (n, vfe, c)) :: c_var_env) in
+        let cc_closure = Closure ("cc", c_var_env, rest) in
+        helper c (a :: cc_closure :: xs) new_ve c_out
+      | _ :: xs -> failwith "Call failure."
+      | [] -> failwith "Call failure. Empty stack"  
+      )
+    | Ret :: rest -> 
+      (
+      match ret_com(c_stack) with
+      | (cs, cc) -> helper (cc @ rest) cs c_var_env c_out (* Append commands from function to our running program, and return our new stack with the closure popped off*)
+      | _ -> failwith "Ret did not return stack and new commands"
+      )
     | Bind :: rest ->
       (
       match bind_com(c_stack)(c_var_env) with
       | (cs, cve) -> helper rest cs cve c_out (*Extract the current stack and current variable environment from bind's output and pass it into helper*)
       | _ -> failwith "Bind did not return proper environments"
       )
-    | Lookup :: rest ->       helper rest (lookup_com(c_stack))     c_var_env c_out
-    | Fun(c1) :: rest
+    | Lookup :: rest ->       helper rest (lookup_com(c_stack)(c_var_env))     c_var_env c_out
+    | Fun(c1) :: rest ->      helper rest (fun_com(c_stack)(c_var_env)(c1))    c_var_env c_out
     | Trace :: rest ->
       (
       match trace_com(c_stack)(c_out) with
       | (cs, co) -> helper rest cs c_var_env co
       | _ -> failwith "Trace did not return proper stack & output"
       )
-  in helper program [] [] []
+  in helper program ([] : const list) [] []
