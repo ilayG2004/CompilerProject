@@ -21,5 +21,8 @@ Ilay Guler 2023 --
   Began work on implementing the execute function, which will run through a stack program, and produce an output represented by when trace is called.
   Trace is a command that will take the top value off the stack and represents it in string form for our output. (More can be found on pdf of operational semantics)
   Binary operators, Push, Dup, and Pop have been completed for execute function.
+
+12/27/2023:
+  Implemented support for executing if-else statements, trace, bind, and lookup. Trace, and Bind are unique because they return a tuple containing the edited stack and output or variable environment respectively. 
   
 
