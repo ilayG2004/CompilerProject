@@ -144,17 +144,27 @@ let rec parse_matcher (xs : char list) =
     | _  :: rest -> helper rest accum (*  Implement in future some form of compilation error here   *)
   in List.rev(helper ws ([] : prog))
 and extract_until_end xs =
-  let rec aux acc = function
-    | 'E' :: 'n' :: 'd' :: ';' :: rest -> (List.rev acc, rest)
+  let rec aux acc if_count = function
+    | 'E' :: 'n' :: 'd' :: ';' :: rest -> 
+      if (if_count = 0) then
+        (List.rev acc, rest)
+      else 
+        aux (';' :: 'd' :: 'n' :: 'E' :: acc) (if_count - 1) rest
+    | 'I' :: 'f' :: rest -> aux ('f' :: 'I' :: acc) (if_count + 1) rest
+    | c :: rest -> aux (c :: acc) if_count rest
     | [] -> failwith "Unexpected end of input while parsing Fun"
-    | c :: rest -> aux (c :: acc) rest
-in aux [] xs
+in aux [] 0 xs
 and extract_until_else xs =
-  let rec aux acc = function
-  | 'E' :: 'l' :: 's' :: 'e' :: rest -> (List.rev acc, rest)
+  let rec aux acc if_count = function
+  | 'E' :: 'l' :: 's' :: 'e' :: rest -> 
+    if (if_count = 0) then
+      (List.rev acc, rest)
+    else 
+      aux ('e' :: 's' :: 'l' :: 'E' :: acc) (if_count - 1) rest
+  | 'I' :: 'f' :: rest -> aux ('f' :: 'I' :: acc) (if_count + 1) rest
+  | c :: rest -> aux (c :: acc) if_count rest
   | [] -> failwith "Unexpected end of input while parsing If with Else"
-  | c :: rest -> aux (c :: acc) rest
-in aux [] xs
+in aux [] 0 xs
 
 
 (*  Takes a string and return a character list made of its character  *)
@@ -238,9 +248,7 @@ let fun_com (c_stack)(c_var_env)(c1)=
 (*  Ret command consumes closure, then executes the commands C with variable environment ve   *)
 let ret_com (c_stack)=
   match c_stack with
-  | Closure (f, vf, c) :: a :: xs -> 
-    let res = pop_com c_stack in
-    (res, c) (* Return our new stack a :: xs, and the commands we now need to execute*)
+  | Closure (f, vf, c) :: a :: xs -> ((a :: xs), c, vf) (* Return our new stack a :: xs, and the commands we now need to execute*)
   | [] -> failwith "Ret failure. Empty stack"
   | _ -> failwith "Ret failure. Closure and some constant a, do not exist at top of the stack"
 
@@ -357,7 +365,7 @@ let execute (s : string) : output=
       (
       match c_stack with
       | Closure (n, vfe, c) :: a :: xs -> 
-        let new_ve = ((n, Closure (n, vfe, c)) :: c_var_env) in
+        let new_ve = ((n, Closure (n, vfe, c)) :: vfe) in
         let cc_closure = Closure ("cc", c_var_env, rest) in
         helper c (a :: cc_closure :: xs) new_ve c_out
       | _ :: xs -> failwith "Call failure."
@@ -366,7 +374,7 @@ let execute (s : string) : output=
     | Ret :: rest -> 
       (
       match ret_com(c_stack) with
-      | (cs, cc) -> helper (cc @ rest) cs c_var_env c_out (* Append commands from function to our running program, and return our new stack with the closure popped off*)
+      | (cs, cc, cve) -> helper (cc @ rest) cs cve c_out (* Append commands from function to our running program, and return our new stack with the closure popped off*)
       | _ -> failwith "Ret did not return stack and new commands"
       )
     | Bind :: rest ->
