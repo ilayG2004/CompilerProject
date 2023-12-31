@@ -149,9 +149,9 @@ and extract_until_end xs =
       if (if_count = 0) then
         (List.rev acc, rest)
       else 
-        aux (';' :: 'd' :: 'n' :: 'E' :: acc) (if_count - 1) rest
+                            aux (';' :: 'd' :: 'n' :: 'E' :: acc) (if_count - 1) rest
     | 'I' :: 'f' :: rest -> aux ('f' :: 'I' :: acc) (if_count + 1) rest
-    | c :: rest -> aux (c :: acc) if_count rest
+    | c :: rest ->          aux (c :: acc) if_count rest
     | [] -> failwith "Unexpected end of input while parsing Fun"
 in aux [] 0 xs
 and extract_until_else xs =
@@ -160,9 +160,9 @@ and extract_until_else xs =
     if (if_count = 0) then
       (List.rev acc, rest)
     else 
-      aux ('e' :: 's' :: 'l' :: 'E' :: acc) (if_count - 1) rest
+                          aux ('e' :: 's' :: 'l' :: 'E' :: acc) (if_count - 1) rest
   | 'I' :: 'f' :: rest -> aux ('f' :: 'I' :: acc) (if_count + 1) rest
-  | c :: rest -> aux (c :: acc) if_count rest
+  | c :: rest ->          aux (c :: acc) if_count rest
   | [] -> failwith "Unexpected end of input while parsing If with Else"
 in aux [] 0 xs
 
