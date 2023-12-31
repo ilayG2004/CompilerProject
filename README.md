@@ -23,6 +23,7 @@ Ilay Guler 2023 --
   Binary operators, Push, Dup, and Pop have been completed for execute function.
 
 12/27/2023:
-  Implemented support for executing if-else statements, trace, bind, and lookup. Trace, and Bind are unique because they return a tuple containing the edited stack and output or variable environment respectively. 
+  Implemented support for executing If-Statements, trace, bind, and lookup. Trace, and Bind are unique because they return a tuple containing the edited stack and output or variable environment respectively. 
   
-
+12/30/2023:
+  Fixed parsing bug with nested If-Statements. The parser would read the 'Else' or 'End' of the inner if-statement, and then prematurely stop parsing both, leading to a parse error. Tested stack language with recursive functions such as Factorial and I received the correct output. I will likely test more tomorrow with more complex recursive functions before moving on. I will also change how symbols parse tomorrow. Currently, they can only consist of alphabetical characters, but I would like for them to be alphanumeric.
