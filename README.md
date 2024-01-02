@@ -27,3 +27,11 @@ Ilay Guler 2023 --
   
 12/30/2023:
   Fixed parsing bug with nested If-Statements. The parser would read the 'Else' or 'End' of the inner if-statement, and then prematurely stop parsing both, leading to a parse error. Tested stack language with recursive functions such as Factorial and I received the correct output. I will likely test more tomorrow with more complex recursive functions before moving on. I will also change how symbols parse tomorrow. Currently, they can only consist of alphabetical characters, but I would like for them to be alphanumeric.
+
+  1/1/2024:
+    Added documentation file which describes the operational semantics of the stack language. Included examples for passing cases and error cases of individual commands, as well as describing the nature of the interpreter.
+I included some functions which are common in higher-level languages, but translated into low-level stack language. 
+    These are common Math functions you would find in Python such as:
+      -Math.abs(n)
+      -Math.factorial(n)
+      -Math.pow(x,y)
