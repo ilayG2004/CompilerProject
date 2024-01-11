@@ -38,3 +38,6 @@ I included some functions which are common in higher-level languages, but transl
 
 1/8/2024:
   Created OCaml types for basic python expressions. Leaving out implementation of strings, and arrays for now, until I update the stack language to support that in the future. Created a doc to keep track of expressions from Python -> OCaml types.
+
+1/10/2024:
+  Completed parsing for boolean expressions. Partial completion of if statements, def, and for and while loops. Parsing python expressions is far more complex and time-consuming since the context of an expression depends on several characters that come before it.
