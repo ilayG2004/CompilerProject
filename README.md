@@ -35,3 +35,6 @@ I included some functions which are common in higher-level languages, but transl
       -Math.abs(n)
       -Math.factorial(n)
       -Math.pow(x,y)
+
+1/8/2024:
+  Created OCaml types for basic python expressions. Leaving out implementation of strings, and arrays for now, until I update the stack language to support that in the future. Created a doc to keep track of expressions from Python -> OCaml types.
