@@ -33,7 +33,7 @@ type expr =
 (*| Lambda of *)
 | Break
 | Continue
-| Trace of expr
+| Print of expr
 
 (*Modified version of interpreter's whitespace function. \t is not considered a whitespace in python. We need to read indents for parsing*)
 let rec py_whitespace (xs : char list) : char list =
@@ -46,16 +46,47 @@ let rec py_whitespace (xs : char list) : char list =
   | _ -> accum
 in List.rev(helper xs ([] : char list))
 
+(* x = 50 | 5+5 | *)
+let rec py_parse_int accum = function
+  | x :: xs when x = '-' -> -1 * py_parse_int 0 xs
+  | x :: xs when x >= '0' && x <= '9' -> py_parse_int (10*accum + (digit_of_char x)) xs
+  | x :: xs -> accum (*Stop on any non-digit character*)
+  | [] -> accum
+and strip_int = function
+  | x :: xs when x = '-' -> strip_int xs
+  | x :: xs when x >= '0' && x <= '9' -> strip_int xs
+  | x :: xs -> xs (*Stop on any non-digit character*)
+  | [] -> []
+
+(* x = 5, Stop upon equal sign*)
+let rec parse_var accum = function
+  | x :: xs when (x >= 'A' && x <= 'Z') || (x >= 'a' && x <= 'z') -> parse_var (accum ^ String.make 1 x) xs
+  | x :: xs when x = '=' -> accum
+  | [] -> accum
+and strip_var = function
+  | x :: xs when (x >= 'A' && x <= 'Z') || (x >= 'a' && x <= 'z') -> strip_var xs
+  | x :: xs when x = '=' -> strip_var xs
+  | _ :: xs -> xs
+  | [] -> []
 let rec py_parse_expr(xs : char list) =
   let ws = py_whitespace xs in
   let rec helper xs accum =
     match xs with
-    | 'T' :: 'r' :: 'u' :: 'e' ::  rest ->                            helper rest (Bool(true))
-    | 'F' :: 'a' :: 'l' :: 's' :: 'e' ::  rest ->                     helper rest (Bool(false))
-
+    | x :: rest when (x >= '0' && x <= '9') || (x = '-') -> 
+     (
+      let n = py_parse_int 0 (x :: rest) in
+      let xss = strip_int rest in
+      helper xss (Int (n) :: accum)
+     )
+    | 'T' :: 'r' :: 'u' :: 'e' ::  rest ->                            helper rest (Bool(true) :: accum)
+    | 'F' :: 'a' :: 'l' :: 's' :: 'e' ::  rest ->                     helper rest (Bool(false) :: accum)
+    | x :: rest when (x >= 'A' && x <= 'Z') || (x >= 'a' && x <= 'z') ->
+      let s = parse_var "" (x :: rest) in
+      let xss = strip_var rest in
+      helper xss (Var (s) :: accum)
     | 'b' :: 'r' :: 'e' :: 'a' :: 'k' :: rest ->                      helper rest (Break :: accum)
     | 'c' :: 'o' :: 'n' :: 't' :: 'i' :: 'n' :: 'u' :: 'e' :: rest -> helper rest (Continue :: accum)
-    | 'w' :: 'h' :: 'i' :: 'l' :: 'e' :: rest -> 
+    (*| 'w' :: 'h' :: 'i' :: 'l' :: 'e' :: rest -> 
       let condition, rest_after_cond = extract_until_colon rest in
       let body, rest_after_body =      extract_until_indent rest_after_cond in
       helper rest_after_body (While (parse_expr condition, parse_expr body) :: accum)
@@ -75,7 +106,13 @@ let rec py_parse_expr(xs : char list) =
       let param, rest_after_param =     extract_until_colon rest_after_name in
       let body, rest_after_body =       extract_until_indent rest_after_param in
       helper rest_after_body (Def (parse_expr name, parse_expr param, parse_expr body) :: accum)
-      
+    | 'p' :: 'r' :: 'i' :: 'n' :: 't' :: '(' :: rest ->
+      let body, rest_after_body =       extract_until_endparenthasis rest in
+      helper rest_after_body (Print (parse_expr body) :: accum)
+    | '[' :: rest ->
+      let body, rest_after_body =       extract_until_bracket rest in
+      helper rest_after_body (Seq (parse_expr body) :: accum)*)
+    | [] -> accum
   in List.rev(helper ws ([] : expr list))
 
 let rec py_parse(s : string) : expr list =

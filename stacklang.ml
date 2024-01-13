@@ -64,10 +64,10 @@ let digit_of_char(ch: char): int =
 (*  If our characters are digits, continue to accumulate them into an integer   *)
 exception No_Proper_Closure
 let rec parse_int accum = function
-   | x :: xs when x = '-' -> -1 * parse_int 0 xs
-   | x :: xs when x >= '0' && x <= '9' -> parse_int (10*accum + (digit_of_char x)) xs
-   | x :: xs when x = ';' -> accum
-   | xs -> raise No_Proper_Closure
+  | x :: xs when x = '-' -> -1 * parse_int 0 xs
+  | x :: xs when x >= '0' && x <= '9' -> parse_int (10*accum + (digit_of_char x)) xs
+  | x :: xs when x = ';' -> accum
+  | xs -> raise No_Proper_Closure
 
 (*  If our character is alphabetical, continue to accumulate into new string through appending accumulator to string of char x  *)
 let rec parse_string accum = function
