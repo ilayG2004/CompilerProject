@@ -39,8 +39,6 @@ type expr =
 let rec py_whitespace (xs : char list) : char list =
  let rec helper xs accum =
   match xs with
-  | ' ' :: rest -> helper rest accum
-  | '\n' :: rest -> helper rest accum
   | ',' :: rest -> helper rest accum
   | c :: rest -> helper rest (c :: accum)
   | _ -> accum
@@ -61,13 +59,93 @@ and strip_int = function
 (* x = 5, Stop upon equal sign*)
 let rec parse_var accum = function
   | x :: xs when (x >= 'A' && x <= 'Z') || (x >= 'a' && x <= 'z') -> parse_var (accum ^ String.make 1 x) xs
+  | x :: xs when x = ' ' -> parse_var accum xs
   | x :: xs when x = '=' -> accum
   | [] -> accum
 and strip_var = function
   | x :: xs when (x >= 'A' && x <= 'Z') || (x >= 'a' && x <= 'z') -> strip_var xs
-  | x :: xs when x = '=' -> strip_var xs
-  | _ :: xs -> xs
+  | x :: xs when x = ' ' -> strip_var xs
+  | x :: xs when x = '=' -> xs
   | [] -> []
+
+
+let rec eu_colon xs=
+  let rec aux xs acc=
+    match xs with
+    | ':' :: rest -> (List.rev(acc), rest)
+    | x :: rest -> aux rest (x :: acc)
+  in aux xs []
+
+(*Edit functions below to make recursive. If a nested parameter or loop is contained in the outside loop, it may stop checking early
+   Thus include a parenthasis account or 'in' count*)
+(*Extract Until Open Parenthasis is only used to check for the name of a function before its open parenthasis. Does not need to be recursive*)
+let rec eu_open_paren xs pCount =
+  let rec aux xs acc=
+    match xs with
+    | '(' :: rest -> (List.rev(acc), rest)
+    | x :: rest -> aux rest (x :: acc)
+  in aux xs []
+
+let rec eu_close_paren xs=
+  let rec aux xs acc pCount=
+    match xs with
+    | ')' :: rest -> 
+      if (pCount = 0) then
+        (List.rev(acc), rest)
+      else 
+                      aux rest (')' :: acc) (pCount - 1)
+    | '(' :: rest ->  aux rest ('(' :: acc) (pCount + 1)
+    | x :: rest ->    aux rest (x :: acc) pCount
+  in aux xs [] 0
+
+let rec eu_in xs =
+  let rec aux xs acc=
+    match xs with
+    | 'i' :: 'n' :: rest -> (List.rev(acc), rest)
+    | x :: rest -> aux rest (x :: acc)
+  in aux xs []
+
+let rec eu_close_brack xs=
+  let rec aux xs acc bCount=
+    match xs with
+    | ']' :: rest -> 
+      if (bCount = 0) then
+        (List.rev(acc), rest)
+      else 
+                      aux rest (']' :: acc) (bCount - 1)
+    | '[' :: rest ->  aux rest ('[' :: acc) (bCount + 1)
+    | x :: rest ->    aux rest (x :: acc) bCount
+  in aux xs [] 0
+
+let rec eu_indent xs=
+  let rec aux xs acc iCount=
+    (match xs with
+    | '\n' :: rest ->
+      (
+      let nli = iloop rest in
+      if nli = 0 then
+        (List.rev (acc @ ['\n']), rest)
+      else if nli < iCount then
+        (List.rev (acc @ ['\n']), xs)
+      else
+        aux rest (List.rev (acc @ ['\n'])) nli
+      )
+    | 'i' :: 'f' :: rest ->                      aux rest ('f' :: 'i' :: acc) (iCount + 1)
+    | 'f' :: 'o' :: 'r' :: rest ->               aux rest ('r' :: 'o' :: 'f' :: acc) (iCount + 1)
+    | 'd' :: 'e' :: 'f' :: rest ->               aux rest ('f' :: 'e' :: 'd' :: acc) (iCount + 1)
+    | 'w' :: 'h' :: 'i' :: 'l' :: 'e' :: rest -> aux rest ('e' :: 'l' :: 'i' :: 'h' :: 'w' :: acc) (iCount + 1)
+    | x :: rest ->                               aux rest (x :: acc) iCount
+    )
+    in aux xs [] 1
+and iloop xs=
+    let rec loop xs count=
+      match xs with
+      | ' ' :: rest -> loop rest (count + 1)
+      | _ :: rest -> count
+      | [] -> count
+    in loop xs 0
+
+
 let rec py_parse_expr(xs : char list) =
   let ws = py_whitespace xs in
   let rec helper xs accum =
@@ -76,21 +154,17 @@ let rec py_parse_expr(xs : char list) =
      (
       let n = py_parse_int 0 (x :: rest) in
       let xss = strip_int rest in
-      helper xss (Int (n) :: accum)
+                                                                      helper xss (Int (n) :: accum)
      )
     | 'T' :: 'r' :: 'u' :: 'e' ::  rest ->                            helper rest (Bool(true) :: accum)
     | 'F' :: 'a' :: 'l' :: 's' :: 'e' ::  rest ->                     helper rest (Bool(false) :: accum)
-    | x :: rest when (x >= 'A' && x <= 'Z') || (x >= 'a' && x <= 'z') ->
-      let s = parse_var "" (x :: rest) in
-      let xss = strip_var rest in
-      helper xss (Var (s) :: accum)
     | 'b' :: 'r' :: 'e' :: 'a' :: 'k' :: rest ->                      helper rest (Break :: accum)
     | 'c' :: 'o' :: 'n' :: 't' :: 'i' :: 'n' :: 'u' :: 'e' :: rest -> helper rest (Continue :: accum)
     (*| 'w' :: 'h' :: 'i' :: 'l' :: 'e' :: rest -> 
-      let condition, rest_after_cond = extract_until_colon rest in
-      let body, rest_after_body =      extract_until_indent rest_after_cond in
-      helper rest_after_body (While (parse_expr condition, parse_expr body) :: accum)
-    | 'i' :: 'f' :: rest ->
+      let condition, rest_after_cond = eu_colon rest in
+      let body, rest_after_body =      eu_indent rest_after_cond in
+      helper rest_after_body (While (py_parse_expr condition, py_parse_expr body) :: accum)*)
+    (*| 'i' :: 'f' :: rest ->
       let condition, rest_after_cond = extract_until_colon rest in
       let b1, rest_after_b1 =          extract_until_indent rest_after_cond in
       let b2, rest_after_b2 =          extract_until_indent rest_after_b1 in
@@ -112,6 +186,11 @@ let rec py_parse_expr(xs : char list) =
     | '[' :: rest ->
       let body, rest_after_body =       extract_until_bracket rest in
       helper rest_after_body (Seq (parse_expr body) :: accum)*)
+    | x :: rest when (x >= 'A' && x <= 'Z') || (x >= 'a' && x <= 'z') ->
+      let s = parse_var "" (x :: rest) in
+      let xss = strip_var rest in
+                                                                  helper xss (Var (s) :: accum)
+    | ' ' :: rest -> helper rest accum
     | [] -> accum
   in List.rev(helper ws ([] : expr list))
 
