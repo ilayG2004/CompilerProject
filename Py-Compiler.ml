@@ -167,6 +167,12 @@ let rec py_parse_expr(xs : char list) =
       let b, rest_after_body = eu_indent rest_after_cond in
       helper rest_after_body (While(py_parse_expr(c), py_parse_expr(b)) :: accum)
     )
+    | 'f' :: 'o' :: 'r' :: rest -> (
+      let v, rest_after_in = eu_in rest in
+      let s, rest_after_seq = eu_colon rest_after_in in
+      let b, rest_after_body = eu_indent rest_after_seq in
+      helper rest_after_body (For(py_parse_expr(v), py_parse_expr(s), py_parse_expr(b)) :: accum)
+    )
     | x :: rest when (x >= 'A' && x <= 'Z') || (x >= 'a' && x <= 'z') -> (
       let s = parse_var "" (x :: rest) in
       let xss = strip_var rest in
