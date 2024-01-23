@@ -41,3 +41,6 @@ I included some functions which are common in higher-level languages, but transl
 
 1/10/2024:
   Completed parsing for boolean expressions. Partial completion of if statements, def, and for and while loops. Parsing python expressions is far more complex and time-consuming since the context of an expression depends on several characters that come before it.
+
+1/22/2024:
+  Partially completed parsing for eu_indent (extract until indent), which properly reads code blocks for defintions, loop, and if statements. Implemented parsing for while and for loops.
