@@ -21,19 +21,20 @@ type bopr =
 (*| Is | IsNot*)
 type expr =
 | Int of int | Bool of bool | Float of float (*| Char of char | String of string*)
-| UOpr of uopr * expr
-| BOpr of bopr * expr * expr
+| UOpr of uopr * pro
+| BOpr of bopr * pro * pro
 | Var of string
-| Param of string * expr
-| Seq of expr list
-| Ifte of expr * expr * expr
-| While of expr * expr
-| For of expr * expr * expr
-| Def of string * expr * expr
+| Param of string * pro
+| Seq of pro
+| Ifte of pro * pro * pro
+| While of pro * pro
+| For of pro * pro * pro
+| Def of string * pro * pro
 (*| Lambda of *)
 | Break
 | Continue
-| Print of expr
+| Print of pro
+and pro = expr list
 
 (*Modified version of interpreter's whitespace function. \t is not considered a whitespace in python. We need to read indents for parsing*)
 let rec py_whitespace (xs : char list) : char list =
@@ -124,11 +125,13 @@ let rec eu_indent xs=
       (
       let nli = iloop rest in
       if nli = 0 then
-        (List.rev (acc @ ['\n']), rest)
+        (*(List.rev (acc @ ['\n']), rest)*)
+        (List.rev(acc), rest)
       else if nli < iCount then
-        (List.rev (acc @ ['\n']), xs)
+        (*(List.rev (acc @ ['\n']), xs)*)
+        (List.rev(acc), rest)
       else
-        aux rest (List.rev (acc @ ['\n'])) nli
+        aux rest acc nli
       )
     | 'i' :: 'f' :: rest ->                      aux rest ('f' :: 'i' :: acc) (iCount + 1)
     | 'f' :: 'o' :: 'r' :: rest ->               aux rest ('r' :: 'o' :: 'f' :: acc) (iCount + 1)
@@ -150,21 +153,33 @@ let rec py_parse_expr(xs : char list) =
   let ws = py_whitespace xs in
   let rec helper xs accum =
     match xs with
-    | x :: rest when (x >= '0' && x <= '9') || (x = '-') -> 
-     (
+    | x :: rest when (x >= '0' && x <= '9') || (x = '-') -> (
       let n = py_parse_int 0 (x :: rest) in
       let xss = strip_int rest in
-                                                                      helper xss (Int (n) :: accum)
+      helper xss (Int (n) :: accum)
      )
     | 'T' :: 'r' :: 'u' :: 'e' ::  rest ->                            helper rest (Bool(true) :: accum)
     | 'F' :: 'a' :: 'l' :: 's' :: 'e' ::  rest ->                     helper rest (Bool(false) :: accum)
     | 'b' :: 'r' :: 'e' :: 'a' :: 'k' :: rest ->                      helper rest (Break :: accum)
     | 'c' :: 'o' :: 'n' :: 't' :: 'i' :: 'n' :: 'u' :: 'e' :: rest -> helper rest (Continue :: accum)
-    (*| 'w' :: 'h' :: 'i' :: 'l' :: 'e' :: rest -> 
-      let condition, rest_after_cond = eu_colon rest in
-      let body, rest_after_body =      eu_indent rest_after_cond in
-      helper rest_after_body (While (py_parse_expr condition, py_parse_expr body) :: accum)*)
-    (*| 'i' :: 'f' :: rest ->
+    | 'w' :: 'h' :: 'i' :: 'l' :: 'e' :: rest -> (
+      let c, rest_after_cond = eu_colon rest in
+      let b, rest_after_body = eu_indent rest_after_cond in
+      helper rest_after_body (While(py_parse_expr(c), py_parse_expr(b)) :: accum)
+    )
+    | x :: rest when (x >= 'A' && x <= 'Z') || (x >= 'a' && x <= 'z') -> (
+      let s = parse_var "" (x :: rest) in
+      let xss = strip_var rest in
+      helper xss (Var (s) :: accum)
+    )
+    | ' ' :: rest -> helper rest accum
+    | [] -> accum
+  in List.rev(helper ws ([] : expr list))
+
+let rec py_parse(s : string) : expr list =
+  py_parse_expr(string_listize(s))
+
+(*| 'i' :: 'f' :: rest ->
       let condition, rest_after_cond = extract_until_colon rest in
       let b1, rest_after_b1 =          extract_until_indent rest_after_cond in
       let b2, rest_after_b2 =          extract_until_indent rest_after_b1 in
@@ -186,13 +201,3 @@ let rec py_parse_expr(xs : char list) =
     | '[' :: rest ->
       let body, rest_after_body =       extract_until_bracket rest in
       helper rest_after_body (Seq (parse_expr body) :: accum)*)
-    | x :: rest when (x >= 'A' && x <= 'Z') || (x >= 'a' && x <= 'z') ->
-      let s = parse_var "" (x :: rest) in
-      let xss = strip_var rest in
-                                                                  helper xss (Var (s) :: accum)
-    | ' ' :: rest -> helper rest accum
-    | [] -> accum
-  in List.rev(helper ws ([] : expr list))
-
-let rec py_parse(s : string) : expr list =
-  py_parse_expr(string_listize(s))
